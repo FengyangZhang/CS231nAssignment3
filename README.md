@@ -1,1 +1,1 @@
-"# CS231nAssignment3" 
+# CS231nAssignment3
