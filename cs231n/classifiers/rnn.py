@@ -97,7 +97,7 @@ class CaptioningRNN(object):
     captions_in = captions[:, :-1]
     captions_out = captions[:, 1:]
     
-    # You'll need this 
+    # You'll need this
     mask = (captions_out != self._null)
 
     # Weight and bias for the affine transform from image features to initial
@@ -115,8 +115,6 @@ class CaptioningRNN(object):
     
     loss, grads = 0.0, {}
     ############################################################################
-    # TODO: Implement the forward and backward passes for the CaptioningRNN.   #
-    # In the forward pass you will need to do the following:                   #
     # (1) Use an affine transformation to compute the initial hidden state     #
     #     from the image features. This should produce an array of shape (N, H)#
     # (2) Use a word embedding layer to transform the words in captions_in     #
@@ -135,10 +133,44 @@ class CaptioningRNN(object):
     # defined above to store loss and gradients; grads[k] should give the      #
     # gradients for self.params[k].                                            #
     ############################################################################
-    pass
-    ############################################################################
-    #                             END OF YOUR CODE                             #
-    ############################################################################
+    # forward pass
+    # compute initial hidden state
+    h0, cache_proj = affine_forward(features, W_proj, b_proj)
+    
+    # word embedding layer
+    word_vec, cache_embed = word_embedding_forward(captions_in, W_embed)
+    
+    # vanilla RNN or LSTM to produce hidden state vectors
+    cell_type = self.cell_type
+    if self.cell_type == 'rnn':
+      h, cache_h = rnn_forward(word_vec, h0, Wx, Wh, b)  
+      
+    else:
+      raise ValueError('Invalid cell_type "%s"' % cell_type)
+    
+    # temporal affine to compute scores over the vocab 
+    scores, cache_affine = temporal_affine_forward(h, W_vocab, b_vocab)
+    
+    # temporal softmax to compute loss
+    loss, dx = temporal_softmax_loss(scores, captions_out, mask)
+    
+    
+    # backward pass
+    dh, dW_vocab, db_vocab = temporal_affine_backward(dx, cache_affine)
+    dword_vec, dh0, dWx, dWh, db = rnn_backward(dh, cache_h)
+    dW_embed = word_embedding_backward(dword_vec, cache_embed)
+    df, dW_proj, db_proj = affine_backward(dh0, cache_proj)
+    
+    grads.update({
+            'W_proj' : dW_proj,
+            'b_proj' : db_proj,
+            'W_embed' : dW_embed,
+            'Wx' : dWx,
+            'Wh' : dWh,
+            'b' : db,
+            'W_vocab' : dW_vocab,
+            'b_vocab' : db_vocab
+            })
     
     return loss, grads
 
