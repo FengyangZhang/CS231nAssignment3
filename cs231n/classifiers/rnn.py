@@ -199,7 +199,7 @@ class CaptioningRNN(object):
       where each element is an integer in the range [0, V). The first element
       of captions should be the first sampled word, not the <START> token.
     """
-    N = features.shape[0]
+    N, D = features.shape
     captions = self._null * np.ones((N, max_length), dtype=np.int32)
 
     # Unpack parameters
@@ -209,11 +209,6 @@ class CaptioningRNN(object):
     W_vocab, b_vocab = self.params['W_vocab'], self.params['b_vocab']
     
     ###########################################################################
-    # TODO: Implement test-time sampling for the model. You will need to      #
-    # initialize the hidden state of the RNN by applying the learned affine   #
-    # transform to the input image features. The first word that you feed to  #
-    # the RNN should be the <START> token; its value is stored in the         #
-    # variable self._start. At each timestep you will need to do to:          #
     # (1) Embed the previous word using the learned word embeddings           #
     # (2) Make an RNN step using the previous hidden state and the embedded   #
     #     current word to get the next hidden state.                          #
@@ -229,8 +224,23 @@ class CaptioningRNN(object):
     # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
     # a loop.                                                                 #
     ###########################################################################
-    pass
-    ############################################################################
-    #                             END OF YOUR CODE                             #
-    ############################################################################
+    # initialize the hidden state of the RNN
+    prev_h, _ = affine_forward(features, W_proj, b_proj)
+    
+    # the start col of the captions
+    prev_word = self._start * np.ones((N, ), dtype=np.int32)
+    captions[:, 0] = prev_word
+    
+    # at each time step do the following:
+    for t in xrange(1, max_length-1):
+      # embed the current word
+      word_vec, _ = word_embedding_forward(prev_word, W_embed)
+      # RNN step
+      prev_h, _ = rnn_step_forward(word_vec, prev_h, Wx, Wh, b)
+      # get scores of all words
+      scores, _ = temporal_affine_forward(prev_h, W_vocab, b_vocab)
+      # select the word with the highest score and write to captions
+      prev_word = np.argmax(scores, axis=1)
+      captions[:, t] = prev_word  
+        
     return captions

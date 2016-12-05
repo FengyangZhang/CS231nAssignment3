@@ -191,13 +191,8 @@ def word_embedding_forward(x, W):
   #                                                                            #
   # HINT: This should be very simple.                                          #
   ##############################################################################
-  N, T = x.shape
-  V, D = W.shape
-  out = np.zeros((N, T, D))
-  for n in xrange(N):
-    for t in xrange(T):
-      out[n, t, :] = W[x[n, t]]
   
+  out = W[x]
   cache = (x, W)
   ##############################################################################
   #                               END OF YOUR CODE                             #
@@ -227,11 +222,9 @@ def word_embedding_backward(dout, cache):
   # HINT: Look up the function np.add.at                                       #
   ##############################################################################
   x, W = cache
-  N, T, D = dout.shape
+
   dW = np.zeros_like(W)
-  for n in xrange(N):    
-    for t in xrange(T):
-      np.add.at(dW, x[n, t], dout[n, t, :])
+  np.add.at(dW, x, dout)
 
   return dW
   ##############################################################################
@@ -398,10 +391,8 @@ def temporal_affine_forward(x, w, b):
   - out: Output data of shape (N, T, M)
   - cache: Values needed for the backward pass
   """
-  N, T, D = x.shape
-  M = b.shape[0]
-  out = x.reshape(N * T, D).dot(w).reshape(N, T, M) + b
-  cache = x, w, b, out
+  out = x.reshape(x.shape[0], -1).dot(w) + b
+  cache = (x, w, b)
   return out, cache
 
 
