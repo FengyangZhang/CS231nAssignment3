@@ -141,9 +141,11 @@ class CaptioningRNN(object):
     word_vec, cache_embed = word_embedding_forward(captions_in, W_embed)
     
     # vanilla RNN or LSTM to produce hidden state vectors
-    cell_type = self.cell_type
     if self.cell_type == 'rnn':
       h, cache_h = rnn_forward(word_vec, h0, Wx, Wh, b)  
+    
+    elif self.cell_type == 'lstm':
+      h, cache_h = lstm_forward(word_vec, h0, Wx, Wh, b)
       
     else:
       raise ValueError('Invalid cell_type "%s"' % cell_type)
@@ -157,7 +159,16 @@ class CaptioningRNN(object):
     
     # backward pass
     dh, dW_vocab, db_vocab = temporal_affine_backward(dx, cache_affine)
-    dword_vec, dh0, dWx, dWh, db = rnn_backward(dh, cache_h)
+    
+    if self.cell_type == 'rnn':
+      dword_vec, dh0, dWx, dWh, db = rnn_backward(dh, cache_h)
+    
+    elif self.cell_type == 'lstm':
+      dword_vec, dh0, dWx, dWh, db = lstm_backward(dh, cache_h)
+    
+    else:
+      raise ValueError('Invalid cell_type "%s"' % cell_type)
+    
     dW_embed = word_embedding_backward(dword_vec, cache_embed)
     df, dW_proj, db_proj = affine_backward(dh0, cache_proj)
     
@@ -236,9 +247,13 @@ class CaptioningRNN(object):
       # embed the current word
       word_vec, _ = word_embedding_forward(prev_word, W_embed)
       # RNN step
-      prev_h, _ = rnn_step_forward(word_vec, prev_h, Wx, Wh, b)
+      if self.cell_type == 'rnn':
+        prev_h, _ = rnn_step_forward(word_vec, prev_h, Wx, Wh, b)
+      elif self.cell_type == 'lstm':
+        prev_c = np.zeros_like(prev_h)
+        prev_h, _, _ = lstm_step_forward(word_vec, prev_h, prev_c, Wx, Wh, b)
       # get scores of all words
-      scores, _ = temporal_affine_forward(prev_h, W_vocab, b_vocab)
+      scores, _ = affine_forward(prev_h, W_vocab, b_vocab)
       # select the word with the highest score and write to captions
       prev_word = np.argmax(scores, axis=1)
       captions[:, t] = prev_word  

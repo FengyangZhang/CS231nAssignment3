@@ -144,10 +144,6 @@ def rnn_backward(dh, cache):
   - db: Gradient of biases, of shape (H,)
   """
   ##############################################################################
-  # TODO: Implement the backward pass for a vanilla RNN running an entire      #
-  # sequence of data. You should use the rnn_step_backward function that you   #
-  # defined above.                                                             #
-  ##############################################################################
   next_h, Wx, Wh, b, x, prev_h = cache[-1]
   _, D = x.shape
   N, T, H = dh.shape
@@ -343,9 +339,9 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
 
   da = np.zeros_like(a)
   da[:, :H] = da_i
-  da[:, H:2 * H] = da_f
-  da[:, 2 * H:3 * H] = da_o
-  da[:, 3 * H:] = da_g
+  da[:, H:2*H] = da_f
+  da[:, 2*H:3*H] = da_o
+  da[:, 3*H:] = da_g
   dx = da.dot(Wx.T)
   dWx = x.T.dot(da)
 
@@ -381,12 +377,16 @@ def lstm_forward(x, h0, Wx, Wh, b):
   """
   h, cache = None, None
   #############################################################################
-  # TODO: Implement the forward pass for an LSTM over an entire timeseries.   #
-  # You should use the lstm_step_forward function that you just defined.      #
-  #############################################################################
-  pass
-  ##############################################################################
-  #                               END OF YOUR CODE                             #
+  N, T, D = x.shape
+  _, H = h0.shape
+  h = np.zeros((N, T, H))
+  c_interm = np.zeros((N, H))
+  h_interm = h0
+  cache = []
+  for i in xrange(T):    
+    h[:, i, :], c_interm, cache_sub = lstm_step_forward(x[:, i, :], h_interm, c_interm, Wx, Wh, b) 
+    h_interm = h[:, i, :]    
+    cache.append(cache_sub)
   ##############################################################################
 
   return h, cache
@@ -408,13 +408,24 @@ def lstm_backward(dh, cache):
   - db: Gradient of biases, of shape (4H,)
   """
   dx, dh0, dWx, dWh, db = None, None, None, None, None
-  #############################################################################
-  # TODO: Implement the backward pass for an LSTM ovetemporal_affine_forwardr an entire timeseries.  #
-  # You should use the lstm_step_backward function that you just defined.     #
-  #############################################################################
-  pass
   ##############################################################################
-  #                               END OF YOUR CODE                             #
+  x, prev_h, prev_c, next_c, Wx, Wh, b, a, i, f, o, g, a_g, cache_i, cache_f, cache_o = cache[-1]
+  _, D = x.shape
+  N, T, H = dh.shape
+  dx = np.zeros((N, T, D))
+  dh0 = np.zeros((N, H))
+  dWx = np.zeros((D, 4*H))
+  dWh = np.zeros((H, 4*H))
+  db = np.zeros(4*H)
+  dprev_h = np.zeros((N, H))
+  dprev_c = np.zeros((N, H))
+  for i in xrange(T-1, -1, -1):
+    dx_, dprev_h, dprev_c, dWx_, dWh_, db_ = lstm_step_backward(dh[:, i, :] + dprev_h, dprev_c, cache.pop())
+    dx[:, i, :] = dx_
+    dWx += dWx_
+    dWh += dWh_
+    db += db_
+  dh0 = dprev_h
   ##############################################################################
   
   return dx, dh0, dWx, dWh, db
@@ -436,8 +447,10 @@ def temporal_affine_forward(x, w, b):
   - out: Output data of shape (N, T, M)
   - cache: Values needed for the backward pass
   """
-  out = x.reshape(x.shape[0], -1).dot(w) + b
-  cache = (x, w, b)
+  N, T, D = x.shape
+  M = b.shape[0]
+  out = x.reshape(N * T, D).dot(w).reshape(N, T, M) + b
+  cache = x, w, b, out
   return out, cache
 
 
